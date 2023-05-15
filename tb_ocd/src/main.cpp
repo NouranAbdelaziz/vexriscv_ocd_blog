@@ -7,20 +7,28 @@
 #include "./common/framework.h"
 #include "./common/jtag.h"
 #include "./common/uart.h"
+//#include "./common/data_uart.h"
 
 class topWorkspace : public Workspace<Vtop>{
 public:
 	topWorkspace() : Workspace("top"){
-		ClockDomain *clk = new ClockDomain(&top->clk,NULL,83333,300000);
+		//ClockDomain *clk = new ClockDomain(&top->clk,NULL,83333,300000);
+		ClockDomain *clk = new ClockDomain(&top->clk,NULL,1000,300000);
 //		UartRx *uartRx = new UartRx(&top->io_uart_txd,1.0e12/115200);
 //		UartTx *uartTx = new UartTx(&top->io_uart_rxd,1.0e12/115200);
 
 		timeProcesses.push_back(clk);
 //		timeProcesses.push_back(uartRx);
 //		timeProcesses.push_back(uartTx);
-
-		Jtag *jtag = new Jtag(&top->jtag_tms,&top->jtag_tdi,&top->jtag_tdo,&top->jtag_tck,83333*4);
+		//uint8_t data;
+		//Jtag *jtag = new Jtag(&top->jtag_tms,&top->jtag_tdi,&top->jtag_tdo,&top->jtag_tck,83333*4);
+		//Jtag *jtag = new Jtag(&top->uart_RX,&top->uart_TX,83333*4);
+		Jtag *jtag = new Jtag(&top->jtag_in_buffer,&top->jtag_out_buffer, &top->tx_start, &top->tx_done, &top->rx_done , &top-> send_to_ocd, 1000*2);
+		//Jtag *jtag = new Jtag(&data, 83333*2);
 		timeProcesses.push_back(jtag);
+		/*cout << "dataaaa in main is "<< unsigned(data)<<endl;
+		uart *Uart = new uart(&top->uart_RX,&top->uart_TX, &data, 83333*4);
+		timeProcesses.push_back(Uart);*/
 
 		#ifdef TRACE
 		//speedFactor = 10e-3;

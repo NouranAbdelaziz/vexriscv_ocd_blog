@@ -92,7 +92,8 @@ gdb_only:
 	$(TARGET)-gdb -q \
 		progmem.elf \
 		-ex "target extended-remote localhost:3333" \
-		-ex "set remotetimeout unlimited"
+		-ex "set remotetimeout unlimited" \
+		-ex "set tcp connect-timeout unlimited"
 gdb: 
 	OPENOCD_DIR=$(OPENOCD_DIR) $(TARGET)-gdb -q \
 		progmem.elf \

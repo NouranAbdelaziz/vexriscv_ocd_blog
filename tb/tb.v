@@ -12,6 +12,19 @@ module tb;
         #50;
     end
 
+    reg rstn;
+    // RESET
+    initial begin
+        clk = 0;
+        rstn = 1;
+        #10;
+        @(posedge clk);
+        rstn = 0;
+        #100;
+        @(posedge clk);
+        rstn = 1;
+    end
+
     initial begin
         if ($test$plusargs("fst"))
             $dumpfile("waves.fst");
@@ -24,7 +37,7 @@ module tb;
 
     wire led0, led1, led2, button;
 
-    top u_top(
+    /*top u_top(
         .clk(clk),
         .jtag_tck(1'b0),
         .jtag_tms(1'b0),
@@ -33,6 +46,17 @@ module tb;
         .led1(led1),
         .led2(led2),
         .button(button)
+    );*/
+
+    top u_top(
+        .clk(clk),
+        //.rstn(rstn),
+        .led0(led0),
+        .led1(led1),
+        .led2(led2),
+        .button(button),
+        .uart_RX(1'b0),
+        .uart_TX()
     );
     
     reg led0_d, led1_d, led2_d;
