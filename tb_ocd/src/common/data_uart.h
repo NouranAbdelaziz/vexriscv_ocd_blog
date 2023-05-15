@@ -1,4 +1,5 @@
 
+
 #include <stdio.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -8,8 +9,102 @@
 #include <sys/ioctl.h>
 #include <netinet/tcp.h>
 
-#include <iostream>
-#include <fstream>
+
+class uart : public TimeProcess{
+public:
+	//CData *tms, *tdi, *tdo, *tck;
+	CData *RX, *TX;
+    uint8_t *data;
+	uint64_t tooglePeriod;
+//	char buffer[1024];
+
+	//Jtag(CData *tms, CData *tdi, CData *tdo, CData* tck,uint64_t period){
+	uart(CData *RX, CData *TX, uint8_t *data, uint64_t period){
+		this->RX = RX;
+		this->TX = TX;
+        this->data = data; 
+		this->tooglePeriod = period/2;
+		*TX = 0;
+		*RX = 0;
+		schedule(0);
+
+	}
+	
+
+	virtual void tick(){
+		//cout << "data from buffer is " << unsigned(*data) << endl;
+		schedule(tooglePeriod);
+	}
+
+};
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#include <stdio.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <string.h>
+#include <arpa/inet.h>
+#include <fcntl.h>
+#include <sys/ioctl.h>
+#include <netinet/tcp.h>
 
 /** Returns true on success, or false if there was an error */
 bool SetSocketBlockingEnabled(int fd, bool blocking)
@@ -29,9 +124,9 @@ bool SetSocketBlockingEnabled(int fd, bool blocking)
 
 class Jtag : public TimeProcess{
 public:
-	//CData *tms, *tdi, *tdo, *tck;
-	//CData *RX, *TX;
-	CData *jtag_in, *jtag_out, *tx_start, *tx_done, *rx_done, *send_to_ocd ;
+	CData *tms, *tdi, *tdo, *tck;
+	CData *RX, *TX;
+	
 	enum State {reset};
 	uint32_t state;
 
@@ -40,42 +135,25 @@ public:
 	struct sockaddr_storage serverStorage;
 	socklen_t addr_size;
 	uint64_t tooglePeriod;
-
-	ofstream LogFile;
 //	char buffer[1024];
 
 	//Jtag(CData *tms, CData *tdi, CData *tdo, CData* tck,uint64_t period){
-	//Jtag(CData *RX, CData *TX, uint64_t period){
-	Jtag(CData *jtag_in, CData *jtag_out, CData* tx_start, CData* tx_done, CData* rx_done, CData* send_to_ocd, uint64_t period){
+	Jtag(CData *RX, CData *TX, uint64_t period){
+	
 		/*this->tms = tms;
 		this->tdi = tdi;
 		this->tdo = tdo;
 		this->tck = tck;*/
-		/*this->RX = RX;
-		this->TX = TX;*/
-		this-> jtag_in = jtag_in;
-		this-> jtag_out = jtag_out;
-		this-> tx_start = tx_start;
-		this-> tx_done = tx_done;
-		this-> rx_done = rx_done;
-		this-> send_to_ocd = send_to_ocd;
+		this->RX = RX;
+		this->TX = TX;
+		
 		this->tooglePeriod = period/2;
-
-		
-		
-		
 		/**tms = 0;
 		*tdi = 0;
 		*tdo = 0;
 		*tck = 0;*/
-		/**TX = 0;
-		*RX = 0;*/
-		*jtag_in = 0;
-		*jtag_out = 0;
-		*tx_start = 0;
-		*tx_done = 0;
-		*rx_done = 0;
-		*send_to_ocd = 0;
+		*TX = 0;
+		*RX = 0;
 		state = 0;
 		schedule(0);
 
@@ -119,7 +197,6 @@ public:
 		//---- Accept call creates a new socket for the incoming connection ----//
 		addr_size = sizeof serverStorage;
 		clientHandle = -1;
-		
 
 	}
 	void connectionReset(){
@@ -145,14 +222,12 @@ public:
 	uint8_t rxBuffer[100];
 	int32_t rxBufferSize = 0;
 	int32_t rxBufferRemaining = 0;
-
-	int32_t count =0;
+	int64_t counter =0;
+	int64_t rst_count =0;
 	uint8_t bit_num = 0;
-	bool send_flag = false;
-	bool start_tx = true;
-	bool toggle = true;
-	uint8_t buffer;
-	uint8_t prev_buffer;
+	
+	bool start = true;
+	bool send = false;
 
 	virtual void tick(){
 		
@@ -176,75 +251,94 @@ public:
 			selfSleep--;
 		else{
 			if(clientHandle != -1){
-				
+				uint8_t buffer;
 				int n;
 
 				if(rxBufferRemaining == 0){
-					if(ioctl(clientHandle,FIONREAD,&n) != 0)
+					cout << "rxBufferRemaining == 0"<<endl;
+					if(ioctl(clientHandle,FIONREAD,&n) != 0){
+						cout << "reseeeeettttttt"<<endl;
+						cout << "n value is "<< n<< endl;
 						connectionReset();
+					}
 					else if(n >= 1){
+						cout << " connectedddd   and n >= 1 "<<endl;
+						cout << "n value is "<< n<< endl;
 						rxBufferSize = read(clientHandle,&rxBuffer,100);
 						cout << "RX buffer size is: " << rxBufferSize << endl;
-						LogFile.open("LogFile.txt", std::ofstream::app);
-							if(!LogFile){
-								cout << "Could'nt open log file !"<<endl;
-							}
-						LogFile << "RX buffer size is: " << rxBufferSize << endl;
-						LogFile.close();
 						if(rxBufferSize < 0){
 							connectionReset();
 						}else {
 							rxBufferRemaining = rxBufferSize;
 						}
 					}else {
+						cout << "sleeeeeeeppppp"<<endl;
+						cout << "n value is "<< n<< endl;
 						selfSleep = 30;
 					}
 				}
-				
-				
-				//if(count <= 3000){
-				if(*rx_done ==1 || start_tx ) {
-					//count++;
-					//cout << "rx is done "<<endl;
-					start_tx = false;
-					if(rxBufferRemaining != 0){
+	
+				if(rxBufferRemaining != 0){
+					/*if(bit_num == 8 || start){
+						bit_num = 0;
 
-						buffer = rxBuffer[rxBufferSize - (rxBufferRemaining--)];
-						*jtag_in = buffer;
-						*tx_start = 1;
-
+						buffer = rxBuffer[rxBufferSize - (rxBufferRemaining--)];	
 						cout << "buffer value is: " << unsigned(buffer) << endl;
-							//LogFile << "Files can be tricky, but it is fun enough!"<<endl;
-						LogFile.open("LogFile.txt", std::ofstream::app);
-							if(!LogFile){
-								cout << "Could'nt open log file !"<<endl;
-							}
-						LogFile << "buffer value is: " << unsigned(buffer) << endl;
+						cout << "rxBufferRemaining value is: " << unsigned(rxBufferRemaining) << endl;
 
-						
-
-						if(buffer & 4){
-							buffer = *jtag_out;
-							cout << "Sending buffer value from tdoooo : " << unsigned(buffer) << endl;
-							LogFile << "Sending buffer value from tdoooo : " << unsigned(buffer) << endl;
-							if(-1 == send(clientHandle,&buffer,1,0))
+						if (send && !start){
+							cout << "Sending buffer value from TX : " << unsigned(buffer) << endl;
+							buffer = 0;
+							if(-1 == send(clientHandle,&buffer,1,0)){
 								connectionReset();
+							}
+								
 						}
-							
-					}
-				}
-				else if(!start_tx){
-					*tx_start = 0;
-				}
 
-				//}
+						start = false;
+
+						if(buffer & 4)
+							send = true;
+						else 
+							send = false;
+								 			
+					}
+					
+					*RX = (buffer >> bit_num) & 1;
+					cout<< " RX bit "<< unsigned (bit_num) <<" : " << unsigned(*RX )<<endl;
+					if (send){
+						buffer = buffer | ( (*TX & 0x01) << bit_num);
+						cout<< " TX bit "<< unsigned (bit_num) <<" : " << unsigned(*TX )<<endl;
+					}
+					bit_num ++;
+					*/
+
+					uint8_t buffer = rxBuffer[rxBufferSize - (rxBufferRemaining--)];
+					cout << "buffer value is: " << unsigned(buffer) << endl;
+					cout << "rxBufferRemaining value is: " << unsigned(rxBufferRemaining) << endl;
+					*tms = (buffer & 1) != 0;
+					*tdi = (buffer & 2) != 0;
+					*tck = (buffer & 8) != 0;
+					if(buffer & 4){
+						buffer = (*tdo != 0);
+						//printf("TDO=%d\n",buffer);
+						if(-1 == send(clientHandle,&buffer,1,0))
+							connectionReset();
+					}else {
+
+					//	printf("\n");
+					}
+					
+				}
 			}
 		}
 		schedule(tooglePeriod);
-
-		LogFile.close();
 	}
 
-	
-
 };
+
+
+
+
+
+
